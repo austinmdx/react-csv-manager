@@ -5,6 +5,7 @@ import Papa from 'papaparse';
 const VAT_INVOICE = 'VAT Invoice #';
 const ASIN = 'ASIN';
 const CARRIER_TRACKING = 'Carrier Tracking #';
+const ITEM_NET_TOTAL = 'Item Net Total';
 
 function App() {
   const [csvFile, setCSVFile] = useState(undefined);
@@ -35,20 +36,36 @@ function App() {
         return a[ASIN] < b[ASIN] ? -1 : 1;
       }
     });
-    data = data.filter((item, pos, arr) => {
-      if (pos == 0) {
+    if (fileType) {
+      data = data.filter((item, pos, arr) => {
+        if (pos == 0) {
+          return true;
+        }
+        if (item[VAT_INVOICE] === arr[pos - 1][VAT_INVOICE] && item[ASIN] === arr[pos - 1][ASIN]) {
+          return false;
+        }
         return true;
-      }
-      if ((
-        (fileType && item[VAT_INVOICE] === arr[pos - 1][VAT_INVOICE])
-          || (!fileType && item[CARRIER_TRACKING] === arr[pos - 1][CARRIER_TRACKING])
-      ) && item[ASIN] === arr[pos - 1][ASIN]) {
-        return false;
-      }
-      return true;
-    });
-    const newCSV = Papa.unparse(data);
-    downloadCSV(newCSV, fileType ? 'order.csv' : 'ship.csv');
+      });
+      const newCSV = Papa.unparse(data);
+      downloadCSV(newCSV, 'order.csv');
+    } else {
+      data = data.reduce((res, item, pos) => {
+        item[ITEM_NET_TOTAL] = parseFloat(item[ITEM_NET_TOTAL]);
+        if (pos == 0) {
+          return [item];
+        }
+
+        if (res[res.length - 1][CARRIER_TRACKING] === item[CARRIER_TRACKING]
+          && res[res.length - 1][ASIN] === item[ASIN]) {
+          res[res.length - 1][ITEM_NET_TOTAL] += item[ITEM_NET_TOTAL];
+          return res;
+        }
+        res.push(item);
+        return res;
+      }, []);
+      const newCSV = Papa.unparse(data);
+      downloadCSV(newCSV, 'ship.csv');
+    }
   }
 
   const handleChange = event => {
